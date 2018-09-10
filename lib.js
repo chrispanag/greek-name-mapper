@@ -19,8 +19,13 @@ const options = {
 
 class NameMatcher {
     constructor(dataFile) {
-        this.promise = readFilePromisified(dataFile);
-        this.data = {};
+        if (typeof dataFile === 'string') {
+            this.promise = readFilePromisified(dataFile);
+            this.data = {};
+        } else {
+            this.data = dataFile;
+        }
+        
     }
 
     async init() {
