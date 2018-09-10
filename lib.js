@@ -122,10 +122,4 @@ function fixTh(word) {
     return word;
 }
 
-(async () => {
-    const matcher = new NameMatcher('./data/processed.json');
-    await matcher.init();
-
-    const res = matcher.match('ageliki')
-    console.log(res);
-})()
+module.exports = NameMatcher;
