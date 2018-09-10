@@ -1,7 +1,8 @@
 const fs = require('fs');
 
 const Fuse = require('fuse.js');
-const { sanitizeDiacritics, toGreek } = require('greek-utils');
+const { sanitizeDiacritics } = require('greek-utils');
+const { removeDuplicateLetters, keepMeaningfulVowels, fixC, fixTh, toGreek } = require('./helpers/preprocessing');
 
 const options = {
     caseSensitive: true,
@@ -33,57 +34,55 @@ class NameMatcher {
     }
 
     match(name) {
-        let fromGreeklish = toGreek(fixTh(fixC(name)));
-        if (fromGreeklish.endsWith('σ'))
-            fromGreeklish = fromGreeklish.slice(0, fromGreeklish.length - 1) + 'ς'
+        const greeklish = fixTh(fixC(name));
+        let fromGreeklish = toGreek(greeklish);
 
         fromGreeklish = fromGreeklish[0].toUpperCase() + fromGreeklish.slice(1);
 
-        console.log(fromGreeklish)
+        // console.log(fromGreeklish)
 
+        const firstGreeklishLetter = greeklish[0];
         const firstLetter = sanitizeDiacritics(fromGreeklish[0]).toUpperCase();
 
         const searcher = removeDuplicateLetters(keepMeaningfulVowels(sanitizeDiacritics(fromGreeklish)));
-        console.log(searcher)
+        // console.log(searcher)
 
         if (!(firstLetter in this.data))
             throw new Error(`Unexpected key ${firstLetter}!`);
 
         let searchData = this.data[firstLetter];
-        if (firstLetter == 'Ι') {
+        if (firstGreeklishLetter == 'I') {
             searchData = searchData.concat(this.data['ΕΙ']);
             searchData = searchData.concat(this.data['ΟΙ']);
-        } else if (firstLetter == 'Ε') {
+        } else if (firstGreeklishLetter == 'E') {
             searchData = searchData.concat(this.data['ΑΙ']);
+        } else if (firstGreeklishLetter == 'B') {
+            searchData = searchData.concat(this.data['ΜΠ']);
         }
 
         const fuse = new Fuse(searchData, options);
-        const results = fuse.search(searcher);
+        let results = fuse.search(searcher);
+
+        // 'B' can also be 'ΜΠ'
+        if (greeklish.indexOf('b') > -1 || greeklish.indexOf('B') > -1) {
+            let transformMp = greeklish.replace(/b/g, 'μπ');
+            transformMp = transformMp.replace(/B/g, 'μπ');
+            transformMp = toGreek(transformMp);
+            const sanitizedTransformedMp = removeDuplicateLetters(keepMeaningfulVowels(sanitizeDiacritics(transformMp)));
+            const results_mp = fuse.search(toGreek(sanitizedTransformedMp));
+
+            results = results.concat(results, results_mp);
+        }
+
+        // console.log(results);
 
         if (results.length < 1)
             return false;
         if (results.length > 1)
-            return validateResults(fromGreeklish, results);
+            return validateResults(fromGreeklish, greeklish, results);
 
         return results[0];
     }
-}
-
-function removeDuplicateLetters(word) {
-    const matches = word.match(/(.)\1+/g);
-    let returning = word;
-    if (!matches)
-        return returning;
-
-    for (const match of matches) {
-        console.log(match);
-        returning = returning.replace(match, match[0]);
-    }
-    return returning
-}
-
-function keepMeaningfulVowels(word) {
-    return word.replace(/ι|η|ε|ο|ω|υ|Ι|Ε|Η|Ο|Ω|Υ/g, '');
 }
 
 function readFilePromisified(dataFile, encoding = 'utf8') {
@@ -96,7 +95,8 @@ function readFilePromisified(dataFile, encoding = 'utf8') {
     });
 }
 
-function validateResults(initial, results) {
+function validateResults(initial, greeklish, results) {
+    greeklish = greeklish.toUpperCase();
     initial = initial.toUpperCase();
     let max = 0;
 
@@ -105,22 +105,31 @@ function validateResults(initial, results) {
         const r = sanitizeDiacritics(resulted).toUpperCase();
         let score = 0;
         let i = 0, j = 0;
+        // console.log(r);
         while (i < initial.length && j < r.length) {
 
+            // console.log({ i: initial[i], j: r[j] })
             if (initial[i] == r[j]) {
                 score += 1;
 
             } else {
                 // Check for 'EI' and 'OI'
                 if (j < (r.length - 1)) {
-                    if ((r[j] == 'Ε' && r[j+1] == 'Ι') && initial[i] == 'Ι') {
+                    if ((r[j] == 'Ε' && r[j + 1] == 'Ι') && initial[i] == 'Ι') {
                         j++;
                         continue;
                     }
-                    if ((r[j] == 'Ο' && (r[j+1] == 'Ι') && initial[i] == 'Ι')) {
+
+                    if ((r[j] == 'Ο' && (r[j + 1] == 'Ι') && initial[i] == 'Ι')) {
                         j++;
                         continue;
-                    } 
+                    }
+
+                    if ((r[j] == 'Μ' && (r[j + 1] == 'Π') && greeklish[i] == 'B')) {
+                        j++;
+                        score += 1
+                        continue;
+                    }
                 }
                 if (j > 1) {
                     // Check for double consonants
@@ -153,31 +162,6 @@ function validateResults(initial, results) {
     }
 
     return result;
-}
-
-function isVowelGreek(char) {
-    char = char.toUpperCase();
-    return (char == 'Α') || (char == 'Ε') || (char == 'Η') || (char == 'Ο') || (char == 'Ι') || (char == 'Υ');
-}
-
-function isVowelEnglish(char) {
-    return (char == 'a') || (char == 'e') || (char == 'i') || (char == 'o') || (char == 'y') || (char == 'u');
-}
-
-function fixC(word) {
-    return word.replace('c', 'k');
-}
-
-// For Greeklish words with 'Th' as 'Θ'
-function fixTh(word) {
-    const position = (word.toUpperCase()).indexOf('TH');
-    if (position < 0)
-        return word;
-
-    if (isVowelEnglish(word[position + 2]))
-        return word.slice(0, position) + '8' + word.slice(position + 2);
-
-    return word;
 }
 
 module.exports = NameMatcher;
