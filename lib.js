@@ -7,7 +7,7 @@ const options = {
     caseSensitive: true,
     id: 'name',
     shouldSort: true,
-    threshold: 0.30,
+    threshold: 0.20,
     location: 0,
     distance: 0,
     maxPatternLength: 32,
@@ -25,7 +25,7 @@ class NameMatcher {
         } else {
             this.data = dataFile;
         }
-        
+
     }
 
     async init() {
@@ -43,14 +43,23 @@ class NameMatcher {
 
         const firstLetter = sanitizeDiacritics(fromGreeklish[0]).toUpperCase();
 
+        const searcher = removeDuplicateLetters(keepMeaningfulVowels(sanitizeDiacritics(fromGreeklish)));
+        console.log(searcher)
+
         if (!(firstLetter in this.data))
             throw new Error(`Unexpected key ${firstLetter}!`);
 
-        const searchData = this.data[firstLetter];
-        const fuse = new Fuse(searchData, options);
-        const results = fuse.search(fromGreeklish);
+        let searchData = this.data[firstLetter];
+        if (firstLetter == 'Ι') {
+            searchData = searchData.concat(this.data['ΕΙ']);
+            searchData = searchData.concat(this.data['ΟΙ']);
+        } else if (firstLetter == 'Ε') {
+            searchData = searchData.concat(this.data['ΑΙ']);
+        }
 
-        console.log(results);
+        const fuse = new Fuse(searchData, options);
+        const results = fuse.search(searcher);
+
         if (results.length < 1)
             return false;
         if (results.length > 1)
@@ -58,6 +67,23 @@ class NameMatcher {
 
         return results[0];
     }
+}
+
+function removeDuplicateLetters(word) {
+    const matches = word.match(/(.)\1+/g);
+    let returning = word;
+    if (!matches)
+        return returning;
+
+    for (const match of matches) {
+        console.log(match);
+        returning = returning.replace(match, match[0]);
+    }
+    return returning
+}
+
+function keepMeaningfulVowels(word) {
+    return word.replace(/ι|η|ε|ο|ω|υ|Ι|Ε|Η|Ο|Ω|Υ/g, '');
 }
 
 function readFilePromisified(dataFile, encoding = 'utf8') {
@@ -71,23 +97,50 @@ function readFilePromisified(dataFile, encoding = 'utf8') {
 }
 
 function validateResults(initial, results) {
+    initial = initial.toUpperCase();
     let max = 0;
 
     let result = results[0];
-    for (const r of results) {
+    for (const resulted of results) {
+        const r = sanitizeDiacritics(resulted).toUpperCase();
         let score = 0;
-        let i = 0;
-        while (i < initial.length && i < r.length) {
-            if (!isVowelGreek(initial[i])) {
-                if (initial[i] == r[i])
-                    score += 1;
+        let i = 0, j = 0;
+        while (i < initial.length && j < r.length) {
+
+            if (initial[i] == r[j]) {
+                score += 1;
+
             } else {
-                if (initial[i] == 'ι') {
-                    if (r[i] == 'ι' || r[i] == 'ί') score += 1;
-                    else if (r[i] == 'η' || r[i] == 'ή' || r[i] == 'υ' || r[i] == 'ύ') score += 0.5;
+                // Check for 'EI' and 'OI'
+                if (j < (r.length - 1)) {
+                    if ((r[j] == 'Ε' && r[j+1] == 'Ι') && initial[i] == 'Ι') {
+                        j++;
+                        continue;
+                    }
+                    if ((r[j] == 'Ο' && (r[j+1] == 'Ι') && initial[i] == 'Ι')) {
+                        j++;
+                        continue;
+                    } 
+                }
+                if (j > 1) {
+                    // Check for double consonants
+                    if ((r[j] == r[j - 1])) {
+                        j++;
+                        continue;
+                    }
+                }
+
+                // Check for different "i's"
+                if (initial[i] == 'Ι') {
+                    if (r[j] == 'Η' || r[j] == 'Υ') score += 1;
+                }
+                // Check for different "o's"
+                if (initial[i] == 'Ο') {
+                    if (r[j] == 'Ω') score += 1;
                 }
             }
 
+            j++;
             i++;
         }
 
@@ -95,7 +148,7 @@ function validateResults(initial, results) {
 
         if (score > max) {
             max = score;
-            result = r;
+            result = resulted;
         }
     }
 
@@ -103,7 +156,7 @@ function validateResults(initial, results) {
 }
 
 function isVowelGreek(char) {
-    char = char.toUpperCase()
+    char = char.toUpperCase();
     return (char == 'Α') || (char == 'Ε') || (char == 'Η') || (char == 'Ο') || (char == 'Ι') || (char == 'Υ');
 }
 
