@@ -14,6 +14,10 @@ You can check out the `./tests/example.js` file for an example of the usage of t
 
 Check out the [demo code on Github](https://github.com/chrispanag/greek-name-mapper-demo). :)
 
+## How to build your on dictionary
+
+Coming Soon :)
+
 ## License
 
 [MIT](LICENSE)
