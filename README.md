@@ -1,8 +1,8 @@
 # greek-name-mapper
 
-A dictionary-based package that normalizes greek names from Greeklish to Greek adding the necessary diacritics.
+A **dictionary-based** package that normalizes greek names from Greeklish to Greek adding the necessary diacritics.
 
-**Demo:** https://greek-names-klitiki.herokuapp.com/
+[**Link to a Demo app**](https://greek-names-klitiki.herokuapp.com/) that uses this package
 
 ## How to use
 
