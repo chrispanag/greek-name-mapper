@@ -1,13 +1,13 @@
 {
   "name": "greek-names-mapper",
   "version": "1.0.2",
-  "description": "",
+  "description": "A dictionary-based package that normalizes greek names from Greeklish to Greek adding the necessary diacritics.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Christos Panagiotakopoulos <chrispanag@gmail.com>",
+  "license": "MIT",
   "dependencies": {
     "fuse.js": "^3.2.1",
     "greek-utils": "^1.2.2"

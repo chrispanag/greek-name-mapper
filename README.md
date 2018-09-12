@@ -2,7 +2,7 @@
 
 A **dictionary-based** package that normalizes greek names from Greeklish to Greek adding the necessary diacritics.
 
-[**Link to a Demo app**](https://greek-names-klitiki.herokuapp.com/) that uses this package
+[**Link to a Demo app**](https://greek-names-klitiki.herokuapp.com/) that uses this package.
 
 ## How to use
 
